@@ -39,8 +39,7 @@ public class DenormalizedHermiteSpline
     {
         t = Mathf.Clamp( t, t0, t1 );
         t /= t1 - t0;
-
-        float t_3 = t * t * t;
+        
         float t_2 = t * t;
 
         return ( p0 * ( 6 * t_2 - 6 * t )  + d0 * ( 3 * t_2 - 4 * t + 1 )
