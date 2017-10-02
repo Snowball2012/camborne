@@ -5,14 +5,68 @@ using UnityEngine;
 public struct LineSegment
 {
     public Vector2 p0, p1;
+
+    public Vector2 Eval( float t ) // unclamped
+    {
+        return Vector2.LerpUnclamped( p0, p1, t );
+    }
+
+    public float ClosestPointParam( Vector2 pt )
+    {
+        Vector2 tmp = p1 - p0;
+        return Vector2.Dot( pt, tmp ) / tmp.SqrMagnitude();
+    }
+
+    public void DBG_Show( Color color )
+    {
+        Debug.DrawLine( new Vector3( p0.x, 0.01f, p0.y ), new Vector3( p1.x, 0.01f, p1.y ), color, 0, false );
+    }
 }
 
 public struct CircleArc
 {
-    float t_start;
-    float t_end;
+    public float t_start;
+    public float t_end;
     public Vector2 center;
     public float radius;
+
+    public float ParamToDefRange( float t )
+    {
+        const float period = Mathf.PI * 2;
+        while ( t > period )
+            t -= period;
+        while ( t < 0 )
+            t += period;
+        if ( t > t_end )
+            t -= period;
+        if ( t < t_start )
+            t += period;
+
+        return t;
+    }
+
+    public Vector2 Eval( float t ) // unclamped
+    {
+        return center + ( new Vector2( Mathf.Cos( t ), Mathf.Sin( t ) ) ) * radius;
+    }
+
+    public float GetClosestPoint( Vector2 pt )
+    {
+        return Mathf.Atan2( pt.y, pt.x );
+    }
+
+    public void DBG_Show ( Color color )
+    {
+        const int num_pts = 20; // why not?
+        for ( int i = 1; i < num_pts; ++i )
+        {
+            float start_t = Mathf.Lerp( t_start, t_end, (float)( i - 1 ) / (float)num_pts - 1 );
+            float end_t = Mathf.Lerp( t_start, t_end, (float)( i ) / (float)num_pts - 1 );
+            Vector2 start = Eval( start_t );
+            Vector2 end = Eval( end_t );
+            Debug.DrawLine( new Vector3( start.x, 0.01f, start.y ), new Vector3( end.x, 0.01f, end.y ), color, 0, false );
+        }
+    }
 }
 
 public struct BoxPrimitive
