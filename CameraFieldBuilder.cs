@@ -8,6 +8,7 @@ public struct Intersection
 {
     public float face_edge_param;
     public float cut_param;
+    public bool tool_edge_enters;
 }
 
 public class Intersector
@@ -85,12 +86,11 @@ public class CameraFieldBuilder : MonoBehaviour {
 
     private class TopologyIntersection
     {
-        public TopologyIntersection ( int loop_idx, int edge_idx, int tool_edge_idx, bool tool_edge_enters, Intersection geom )
+        public TopologyIntersection ( int loop_idx, int edge_idx, int tool_edge_idx, Intersection geom )
         {
             m_loop_idx = loop_idx;
             m_edge_idx = edge_idx;
             m_tool_edge_idx = tool_edge_idx;
-            m_tool_edge_enters = tool_edge_enters;
             m_geom = geom;
             m_valid = true;
         }
@@ -108,8 +108,7 @@ public class CameraFieldBuilder : MonoBehaviour {
         int m_tool_edge_idx;
 
         public bool ToolEdgeEnters
-        { get { return m_tool_edge_enters; } }
-        bool m_tool_edge_enters;
+        { get { return m_geom.tool_edge_enters; } }
 
         public bool Valid
         { get { return m_valid; } set { m_valid = value; } }
@@ -124,6 +123,7 @@ public class CameraFieldBuilder : MonoBehaviour {
     {
         // 1. for each edge determine if intersection number is even, then find these intersections.
         // Then make new loops.
+        // TODO : loops without intersections 
 
         IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( field, edges2cut ) );
 
@@ -181,7 +181,13 @@ public class CameraFieldBuilder : MonoBehaviour {
             res.AddRange( seg.edges );
         } while ( last != start_from );
 
-        return res.Count == 0 ? null : res;
+        // TODO: filter degen loops
+        float total_len = 0;
+        foreach ( var edge in res )
+            total_len += edge.GetLen();
+
+        // strict filter. such loops are useless for camera
+        return res.Count == 0 || total_len < 1.0e-2 ? null : res;
     }
 
     private class EdgeIter : IEnumerator<ICuttableEdge>
@@ -233,36 +239,91 @@ public class CameraFieldBuilder : MonoBehaviour {
     {
         if ( start_from.ToolEdgeEnters )
         {
-            return MakeLoopSegment( start_from, map, new EdgeIter( map.tool_edges, start_from.ToolEdgeIdx ) );
+            return MakeLoopSegment( start_from, map, true, new EdgeIter( map.tool_edges, start_from.ToolEdgeIdx ) );
         }
         else
         {
-            return MakeLoopSegment( start_from, map, new EdgeIter( map.target[start_from.LoopIdx], start_from.EdgeIdx ) );
+            return MakeLoopSegment( start_from, map, false, new EdgeIter( map.target[start_from.LoopIdx], start_from.EdgeIdx ) );
         }
     }
 
-    LoopSegment MakeLoopSegment ( TopologyIntersection start_from, BopMap map, IEnumerator<ICuttableEdge> edge_iterator )
+    LoopSegment MakeLoopSegment ( TopologyIntersection start_from, BopMap map, bool tool_seg, IEnumerator<ICuttableEdge> edge_iterator )
     {
         LoopSegment seg;
         seg.start = start_from;
-        seg.edges = new List<ICuttableEdge>();
+        var seg_edges = new List<ICuttableEdge>();
         seg.end = start_from;
         edge_iterator.Reset();
-        var cur_edge = edge_iterator.Current;
-        var cur_edge_intersections = map.edge2intersections[cur_edge];
-        
-        if ( cur_edge_intersections != null && cur_edge_intersections.Count > 0 )
+        do
         {
-            if ( ! ( cur_edge_intersections.Count == 1 && cur_edge_intersections[0].Equals( start_from ) ) )
+            var cur_edge = edge_iterator.Current;
+            var cur_edge_intersections = map.edge2intersections[cur_edge];
+
+            TopologyIntersection start = null;
+            TopologyIntersection end = null;
+
+            if ( cur_edge_intersections != null && cur_edge_intersections.Count > 0 )
             {
-                // stop here
-                throw new System.NotImplementedException();
+                if ( cur_edge_intersections.Contains( start_from ) )
+                    start = start_from;
+
+                if ( !( start != null && cur_edge_intersections.Count == 1 ) )
+                {
+                    bool stop_at_next_is = start == null;
+
+                    foreach ( var intersection in cur_edge_intersections )
+                    {
+                        if ( stop_at_next_is )
+                            end = intersection;
+                        else
+                            stop_at_next_is = start.Equals( intersection );
+                    }
+                }
             }
-        }
 
+            if ( start != null || end != null )
+                cur_edge = CutEdgeWithIntersections( cur_edge, tool_seg, start, end );
 
+            // todo : check for degeneracy
+            if ( cur_edge.GetLen() > 1.0e-6 )
+                seg_edges.Add( cur_edge );
+
+        } while ( edge_iterator.MoveNext() );
+
+        seg.edges = seg_edges;
 
         return seg;
+    }
+
+    private ICuttableEdge CutEdgeWithIntersections ( ICuttableEdge edge, bool tool_seg, TopologyIntersection start, TopologyIntersection end )
+    {
+        ICuttableEdge res = edge;
+
+        if ( start != null )
+            res = res.Cut( tool_seg ? start.Geom.cut_param : start.Geom.face_edge_param, false );
+
+        if ( end != null )
+        {
+            float cut_param_end = tool_seg ? end.Geom.cut_param : end.Geom.face_edge_param;
+            if ( start != null )
+            {
+                EvalRes end_pt = edge.Eval( cut_param_end );
+                cut_param_end = res.GetClosestPoint( end_pt.pt ).normalized_t;
+            }
+            res = res.Cut( cut_param_end, true );
+        }
+
+        return res;
+    }
+
+    private class TopologyIntersectionComparer : IComparer<TopologyIntersection>
+    {
+        public int Compare ( TopologyIntersection x, TopologyIntersection y )
+        {
+            if ( x.Geom.cut_param == y.Geom.cut_param )
+                return 0;
+            return x.Geom.cut_param < y.Geom.cut_param ? -1 : 1;
+        }
     }
 
     private Dictionary<ICuttableEdge, IList<TopologyIntersection>> MakeIntersectionMap( IEnumerable<TopologyIntersection> intersections, IList<List<ICuttableEdge>> face_loops, IList<ICuttableEdge> tool )
@@ -284,6 +345,11 @@ public class CameraFieldBuilder : MonoBehaviour {
             res[tool_edge].Add( intersection );
         }
 
+        // dirty cast. i think it's acceptable here since we've just created this list
+        foreach ( var edge in tool )
+            ( (List<TopologyIntersection>)res[edge] ).Sort( new TopologyIntersectionComparer() );
+
+
         return res;
     }
 
@@ -303,16 +369,8 @@ public class CameraFieldBuilder : MonoBehaviour {
                     var intersections = intersector.Intersect( loop[edge_idx], edges2cut[tool_edge_idx] );
                     foreach ( var intersection in intersections )
                     {
-                        Vector2 face_edge_dir = loop[edge_idx].Eval( intersection.face_edge_param ).dir;
-                        bool tool_edge_enters =
-                            Vector2.Dot(
-                                new Vector2( -face_edge_dir.y, face_edge_dir.x ),
-                                edges2cut[tool_edge_idx].Eval( intersection.cut_param ).dir
-                                ) > 0;
-
                         TopologyIntersection res = new TopologyIntersection(
-                            loop_idx, edge_idx, tool_edge_idx,
-                            tool_edge_enters, intersection );
+                            loop_idx, edge_idx, tool_edge_idx, intersection );
 
                         res_list.Add( res );
                     }

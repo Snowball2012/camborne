@@ -25,6 +25,7 @@ public interface IEdge
 {
     EvalRes Eval ( float normalized_t );
     EdgeCP GetClosestPoint ( Vector2 pt );
+    float GetLen ( );
     void UseImpl ( IEdgeImplementationUser user );
 }
 
@@ -52,6 +53,11 @@ public class CircleEdge : ICuttableEdge
     }
 
     public ICuttableEdge Cut ( float t, bool first_part )
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public float GetLen ( )
     {
         throw new System.NotImplementedException();
     }
@@ -89,6 +95,11 @@ public class LineEdge : ICuttableEdge
     }
 
     public ICuttableEdge Cut ( float t, bool first_part )
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public float GetLen ( )
     {
         throw new System.NotImplementedException();
     }
