@@ -46,6 +46,11 @@ public class DenormalizedHermiteSpline
                + p1 * ( -6 * t_2 + 6 * t ) + d1 * ( 3 * t_2 - 2 * t ) ) * ( t1 - t0 );
     }
 
+    public Vector2 ParamInterval
+    {
+        get { return new Vector2(t0, t1); }
+    }
+
     private Vector3 p0, p1, d0, d1;
 
     private float t0, t1;
@@ -73,6 +78,22 @@ public class CameraOperator : MonoBehaviour
         }
 
         // Todo: change direction and FoV
+    }
+
+    public void DBG_Show( float time )
+    {
+        if ( m_spline != null )
+        {
+            Vector2 interval = m_spline.ParamInterval;
+            float last = interval[0];
+
+            for ( int i = 0; i < 10; ++i )
+            {
+                float cur = ((float)(i + 1)) / 10.0f * (interval[1] - interval[0]);
+                Debug.DrawLine( m_spline.Evaluate( last ), m_spline.Evaluate( cur ), Color.red, time, false);
+                last = cur;
+            }
+        }
     }
 
     public void RefreshDestination ( Vector3 pos, Vector3 dir, float fov, float time_to_reach )
