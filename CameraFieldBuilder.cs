@@ -31,12 +31,15 @@ public class CameraFieldBuilder : MonoBehaviour {
 		
 	}
 
-    public ICameraField Build ( CameraScene cameraScene, CirclePrimitive player, CirclePrimitive target )
+    public CameraField Build ( CameraScene cameraScene, CirclePrimitive player, CirclePrimitive target )
     {
         // 3 steps:
         // 1. Make face from room bounds
         // 2. For each primitive make the occlusion field and cut it from the face
         CameraField res = MakeStartField( cameraScene.RoomBound );
+
+        foreach ( var circle_obstacle in cameraScene.Circles )
+            res = CutFromField( res, MakeOcclusionLoop( player, circle_obstacle ) );
 
         return res;
     }
@@ -82,6 +85,48 @@ public class CameraFieldBuilder : MonoBehaviour {
                 }, true ) );
 
         return new CameraField( new List<List<ICuttableEdge>> { start_loop } );
+    }
+
+    private List<ICuttableEdge> MakeOcclusionLoop ( CirclePrimitive player, CirclePrimitive obstacle )
+    {
+        Vector2 center2center = player.center - obstacle.center;
+
+        float cp_param = Mathf.Atan2( center2center.y, center2center.x );
+        float param_spread = Mathf.Asin( Mathf.Min( ( player.radius + obstacle.radius ) / center2center.magnitude, 1.0f ) );
+        CircleEdge circle_edge = new CircleEdge(
+            new CircleArc
+            {
+                center = obstacle.center,
+                radius = obstacle.radius,
+                t_start = cp_param - param_spread,
+                t_end = cp_param + param_spread
+            },
+            false );
+
+        var circle_end = circle_edge.Eval( 0 );
+        LineEdge edge1 = new LineEdge(
+            new LineSegment
+            {
+                p0 = circle_end.pt,
+                p1 = circle_end.pt - circle_end.dir * 100 
+            },
+            false );
+
+        circle_end = circle_edge.Eval( 1 );
+        LineEdge edge2 = new LineEdge(
+            new LineSegment
+            {
+                p0 = circle_end.pt,
+                p1 = circle_end.pt + circle_end.dir * 100
+            },
+            true );
+
+        List<ICuttableEdge> res = new List<ICuttableEdge>();
+        res.Add( edge1 );
+        res.Add( circle_edge );
+        res.Add( edge2 );
+
+        return res;
     }
 
     private class TopologyIntersection

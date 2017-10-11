@@ -50,6 +50,11 @@ public struct CircleArc
         return center + ( new Vector2( Mathf.Cos( t ), Mathf.Sin( t ) ) ) * radius;
     }
 
+    public Vector2 EvalDir( float t ) // unclamped
+    {
+        return new Vector2( -Mathf.Sin( t ), Mathf.Cos( t ) );
+    }
+
     public float GetClosestPoint( Vector2 pt )
     {
         return Mathf.Atan2( pt.y, pt.x );

@@ -32,34 +32,103 @@ public interface IEdge
 public interface ICuttableEdge : IEdge
 {
     ICuttableEdge Cut ( float t, bool first_part );
+    void DBG_Show ( Color color );
 }
 
 public class CircleEdge : ICuttableEdge
 {
-    CircleEdge ( CircleArc data, bool sense )
+    public CircleEdge ( CircleArc data, bool sense )
     {
         m_data = data;
+        if ( m_data.t_start < 0 )
+        {
+            m_data.t_start += Mathf.PI * 2;
+            m_data.t_end += Mathf.PI * 2;
+        }
+        if ( m_data.t_start > Mathf.PI * 2 )
+        {
+            m_data.t_start -= Mathf.PI * 2;
+            m_data.t_end -= Mathf.PI * 2;
+        }
         m_sense = sense;
     }
 
     public EvalRes Eval ( float t )
     {
-        throw new System.NotImplementedException();
+        if ( ! m_sense )
+            t = 1.0f - t;
+        float unclamped_t = Mathf.Lerp( m_data.t_start, m_data.t_end, t );
+
+        EvalRes res = new EvalRes();
+        res.pt = m_data.Eval( unclamped_t );
+        res.dir = m_data.EvalDir( unclamped_t );
+        if ( ! m_sense )
+            res.dir *= -1;
+
+        return res;
     }
 
     public EdgeCP GetClosestPoint ( Vector2 pt )
     {
-        throw new System.NotImplementedException();
+        EdgeCP res = new EdgeCP();
+        res.normalized_t = m_data.GetClosestPoint( pt );
+
+        bool in_edge_found = false;
+        bool edge_end = false;
+        float min_dist = Mathf.PI * 4;
+        res.normalized_t -= Mathf.PI * 2;
+        while ( res.normalized_t < Mathf.PI * 6 )
+        {
+            if ( res.normalized_t >= m_data.t_start && res.normalized_t <= m_data.t_end )
+            {
+                in_edge_found = true;
+                break;
+            }
+
+            if ( res.normalized_t < m_data.t_start && ( m_data.t_start - res.normalized_t ) < min_dist )
+                min_dist = ( m_data.t_start - res.normalized_t );
+
+            if ( res.normalized_t > m_data.t_end && ( res.normalized_t - m_data.t_end ) < min_dist )
+            {
+                edge_end = true;
+                break;
+            }
+        }
+        if ( ! in_edge_found )
+        {
+            res.at_edge_end = m_sense == edge_end;
+            res.normalized_t = res.at_edge_end.Value ? 1 : 0;
+        }
+        else
+        {
+            res.normalized_t = Mathf.InverseLerp( m_data.t_start, m_data.t_end, res.normalized_t );
+            if ( !m_sense )
+                res.normalized_t = 1 - res.normalized_t;
+        }
+
+        res.pt = Eval( res.normalized_t ).pt;
+
+        return res;
     }
 
     public ICuttableEdge Cut ( float t, bool first_part )
     {
-        throw new System.NotImplementedException();
+        if ( !m_sense )
+            t = 1 - t;
+        float unclamped_t = Mathf.Lerp( m_data.t_start, m_data.t_end, t );
+
+        return new CircleEdge( new CircleArc
+        {
+            center = m_data.center,
+            radius = m_data.radius,
+            t_start = first_part == m_sense ? m_data.t_start : unclamped_t,
+            t_end = first_part == m_sense ? unclamped_t : m_data.t_end
+        }, m_sense );
     }
 
     public float GetLen ( )
     {
-        throw new System.NotImplementedException();
+        return ( m_data.t_end - m_data.t_start ) * m_data.radius;
     }
 
     public void UseImpl ( IEdgeImplementationUser user )
@@ -70,6 +139,11 @@ public class CircleEdge : ICuttableEdge
     public CircleArc Data
     {
         get { return m_data; }
+    }
+
+    public void DBG_Show ( Color color )
+    {
+        m_data.DBG_Show( color );
     }
 
     private bool m_sense;
@@ -84,24 +158,39 @@ public class LineEdge : ICuttableEdge
         m_sense = sense;
     }
 
-    public EvalRes Eval ( double t )
-    {
-        throw new System.NotImplementedException();
-    }
-
     public EdgeCP GetClosestPoint ( Vector2 pt )
     {
-        throw new System.NotImplementedException();
+        EdgeCP res = new EdgeCP();
+
+        res.normalized_t = m_data.ClosestPointParam( pt );
+        if ( res.normalized_t < 0 || res.normalized_t > 1 )
+            res.at_edge_end = res.normalized_t > 0;
+
+        if ( !m_sense )
+        {
+            res.normalized_t = 1 - res.normalized_t;
+
+            if ( res.at_edge_end.HasValue )
+                res.at_edge_end = !res.at_edge_end;
+        }        
+
+        return res;
     }
 
     public ICuttableEdge Cut ( float t, bool first_part )
     {
-        throw new System.NotImplementedException();
+        Vector2 pt = m_data.Eval( t );
+
+        return new LineEdge( new LineSegment
+        {
+            p0 = first_part == m_sense ? m_data.p0 : pt,
+            p1 = first_part == m_sense ? pt : m_data.p1
+        }, m_sense );
     }
 
     public float GetLen ( )
     {
-        throw new System.NotImplementedException();
+        return ( m_data.p0 - m_data.p1 ).magnitude;
     }
 
     public void UseImpl ( IEdgeImplementationUser user )
@@ -109,9 +198,28 @@ public class LineEdge : ICuttableEdge
         user.UseImpl( this );
     }
 
-    public EvalRes Eval ( float normalized_t )
+    public EvalRes Eval ( float t )
     {
-        throw new System.NotImplementedException();
+        if ( !m_sense )
+            t = 1.0f - t;
+
+        EvalRes res = new EvalRes();
+
+        res.pt = m_data.p0 * ( 1.0f - t ) + m_data.p1 * t;
+
+        if ( m_sense )
+            res.dir = m_data.p1 - m_data.p0;
+        else
+            res.dir = m_data.p0 - m_data.p1;
+
+        res.dir.Normalize();
+
+        return res;
+    }
+
+    public void DBG_Show ( Color color )
+    {
+        m_data.DBG_Show( color );
     }
 
     private LineSegment m_data;
