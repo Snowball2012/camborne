@@ -65,8 +65,8 @@ public struct CircleArc
         const int num_pts = 20; // why not?
         for ( int i = 1; i < num_pts; ++i )
         {
-            float start_t = Mathf.Lerp( t_start, t_end, (float)( i - 1 ) / (float)num_pts - 1 );
-            float end_t = Mathf.Lerp( t_start, t_end, (float)( i ) / (float)num_pts - 1 );
+            float start_t = Mathf.Lerp( t_start, t_end, (float)( i - 1 ) / ( (float)num_pts - 1 ) );
+            float end_t = Mathf.Lerp( t_start, t_end, (float)( i ) / ( (float)num_pts - 1 ) );
             Vector2 start = Eval( start_t );
             Vector2 end = Eval( end_t );
             Debug.DrawLine( new Vector3( start.x, 0.01f, start.y ), new Vector3( end.x, 0.01f, end.y ), color, 0, false );
@@ -112,6 +112,11 @@ public struct CirclePrimitive
 {
     public Vector2 center;
     public float radius;
+
+    public void DBG_Show( Color color )
+    {
+        (new CircleArc { center = this.center, radius = this.radius, t_start = 0, t_end = Mathf.PI * 2 }).DBG_Show( color );
+    }
 }
 
 public class CameraScene
@@ -128,6 +133,8 @@ public class CameraScene
         m_room_bounds.DBG_Show( Color.yellow );
         foreach ( BoxPrimitive box in m_boxes )
             box.DBG_Show( Color.green );
+        foreach ( CirclePrimitive circle in m_circles )
+            circle.DBG_Show( Color.green );
     }
 
     public IEnumerable<CirclePrimitive> Circles { get { return m_circles; } }

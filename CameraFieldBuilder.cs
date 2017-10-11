@@ -21,15 +21,41 @@ public class Intersector
 
 public class CameraFieldBuilder : MonoBehaviour {
 
-	// Use this for initialization
-	void Start () {
+    public CameraSceneLoader scene_loader;
+    public CapsuleCollider player;
+    public CapsuleCollider target;
+
+    public bool show_occlusion_fields = false;
+    public bool show_player = false;
+    // Use this for initialization
+    void Start () {
 		
 	}
-	
-	// Update is called once per frame
-	void Update () {
-		
-	}
+
+    Vector2 ConvertTo2d ( Vector3 vec )
+    {
+        return new Vector2( vec.x, vec.z );
+    }
+
+    // Update is called once per frame
+    void Update () {
+        CirclePrimitive player_primitive = new CirclePrimitive();
+        player_primitive.center = ConvertTo2d( player.gameObject.transform.position );
+        player_primitive.radius = player.radius;
+
+        if ( show_player)
+            player_primitive.DBG_Show( Color.red );
+
+        if ( show_occlusion_fields )
+        {
+            foreach ( var circle_obstacle in scene_loader.Scene.Circles )
+            {
+                var loop = MakeOcclusionLoop( player_primitive, circle_obstacle );
+                foreach ( var edge in loop )
+                    edge.DBG_Show( Color.blue );
+            }
+        }
+    }
 
     public CameraField Build ( CameraScene cameraScene, CirclePrimitive player, CirclePrimitive target )
     {
@@ -92,7 +118,7 @@ public class CameraFieldBuilder : MonoBehaviour {
         Vector2 center2center = player.center - obstacle.center;
 
         float cp_param = Mathf.Atan2( center2center.y, center2center.x );
-        float param_spread = Mathf.Asin( Mathf.Min( ( player.radius + obstacle.radius ) / center2center.magnitude, 1.0f ) );
+        float param_spread = Mathf.Acos( Mathf.Min( ( player.radius + obstacle.radius ) / center2center.magnitude, 1.0f ) );
         CircleEdge circle_edge = new CircleEdge(
             new CircleArc
             {
