@@ -14,7 +14,7 @@ public struct LineSegment
     public float ClosestPointParam( Vector2 pt )
     {
         Vector2 tmp = p1 - p0;
-        return Vector2.Dot( pt, tmp ) / tmp.SqrMagnitude();
+        return Vector2.Dot( pt - p0, tmp ) / tmp.SqrMagnitude();
     }
 
     public void DBG_Show( Color color )
@@ -57,6 +57,7 @@ public struct CircleArc
 
     public float GetClosestPoint( Vector2 pt )
     {
+        pt -= center;
         return Mathf.Atan2( pt.y, pt.x );
     }
 

@@ -11,13 +11,6 @@ public struct Intersection
     public bool tool_edge_enters;
 }
 
-public class Intersector
-{
-    public List<Intersection> Intersect ( IEdge edge1, IEdge edge2 )
-    {
-        throw new System.NotImplementedException();
-    }
-}
 
 public class CameraFieldBuilder : MonoBehaviour {
 
@@ -27,6 +20,7 @@ public class CameraFieldBuilder : MonoBehaviour {
 
     public bool show_occlusion_fields = false;
     public bool show_player = false;
+    public bool show_visibility_field = false;
     // Use this for initialization
     void Start () {
 		
@@ -54,6 +48,11 @@ public class CameraFieldBuilder : MonoBehaviour {
                 foreach ( var edge in loop )
                     edge.DBG_Show( Color.blue );
             }
+        }
+
+        if ( show_visibility_field )
+        {
+            Build( scene_loader.Scene, player_primitive, player_primitive ).DBG_Show( Color.magenta );
         }
     }
 
@@ -198,6 +197,9 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( field, edges2cut ) );
 
+        if ( intersections.Count == 0 )
+            return field;
+
         BopMap bop_map = new BopMap();
         {
             bop_map.edge2intersections = MakeIntersectionMap( intersections, field.Loops, edges2cut );
@@ -213,17 +215,17 @@ public class CameraFieldBuilder : MonoBehaviour {
             unprocessed_found = false;
             foreach ( var intersection in intersections )
             {
-                unprocessed_found = true;
                 if ( intersection.Valid )
                 {
+                    unprocessed_found = true;
                     var new_loop = MakeLoop( intersection, bop_map );
-                    if ( new_loop == null )
+                    if ( new_loop != null )
                         new_loops.Add( new_loop );
                 }
             }
         } while ( unprocessed_found );
 
-        return new CameraField(null);
+        return new CameraField( new_loops );
     }
 
     private class BopMap
@@ -285,6 +287,7 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         public void Dispose ( )
         {
+            m_last_try = false;
         }
 
         public bool MoveNext ( )
@@ -293,17 +296,21 @@ public class CameraFieldBuilder : MonoBehaviour {
             if ( m_cur_idx >= m_edges.Count )
                 m_cur_idx = 0;
 
-            return m_cur_idx != m_start_idx;
+            if ( m_cur_idx == m_start_idx )
+                m_last_try = true;
+            return ( m_cur_idx != m_start_idx ) != m_last_try;
         }
 
         public void Reset ( )
         {
             m_cur_idx = m_start_idx;
+            m_last_try = false;
         }
 
         IList<ICuttableEdge> m_edges;
         int m_start_idx;
         int m_cur_idx;
+        bool m_last_try = false;
     }
 
     LoopSegment MakeLoopSegment ( TopologyIntersection start_from, BopMap map )
@@ -321,9 +328,9 @@ public class CameraFieldBuilder : MonoBehaviour {
     LoopSegment MakeLoopSegment ( TopologyIntersection start_from, BopMap map, bool tool_seg, IEnumerator<ICuttableEdge> edge_iterator )
     {
         LoopSegment seg;
-        seg.start = start_from;
+        seg.start = null;
         var seg_edges = new List<ICuttableEdge>();
-        seg.end = start_from;
+        seg.end = null;
         edge_iterator.Reset();
         do
         {
@@ -335,8 +342,11 @@ public class CameraFieldBuilder : MonoBehaviour {
 
             if ( cur_edge_intersections != null && cur_edge_intersections.Count > 0 )
             {
-                if ( cur_edge_intersections.Contains( start_from ) )
+                if ( cur_edge_intersections.Contains( start_from ) && seg.start == null )
+                {
+                    seg.start = start_from;
                     start = start_from;
+                }
 
                 if ( !( start != null && cur_edge_intersections.Count == 1 ) )
                 {
@@ -345,7 +355,10 @@ public class CameraFieldBuilder : MonoBehaviour {
                     foreach ( var intersection in cur_edge_intersections )
                     {
                         if ( stop_at_next_is )
+                        {
                             end = intersection;
+                            break;
+                        }
                         else
                             stop_at_next_is = start.Equals( intersection );
                     }
@@ -359,9 +372,18 @@ public class CameraFieldBuilder : MonoBehaviour {
             if ( cur_edge.GetLen() > 1.0e-6 )
                 seg_edges.Add( cur_edge );
 
+            if ( end != null )
+            {
+                seg.end = end;
+                break;
+            }
+
         } while ( edge_iterator.MoveNext() );
 
         seg.edges = seg_edges;
+
+        seg.start.Valid = false;
+        seg.end.Valid = false;
 
         return seg;
     }
@@ -435,7 +457,7 @@ public class CameraFieldBuilder : MonoBehaviour {
             var loop = field.Loops[loop_idx];
             for ( int edge_idx = 0; edge_idx < loop.Count; ++edge_idx )
             {
-                for ( int tool_edge_idx = edges2cut.Count - 1; tool_edge_idx >= 0; --tool_edge_idx )
+                for ( int tool_edge_idx = 0; tool_edge_idx < edges2cut.Count; ++tool_edge_idx )
                 {
                     var intersections = intersector.Intersect( loop[edge_idx], edges2cut[tool_edge_idx] );
                     foreach ( var intersection in intersections )
@@ -455,6 +477,8 @@ public class CameraFieldBuilder : MonoBehaviour {
     private List<TopologyIntersection> FilterIntersections ( IList<TopologyIntersection> intersections )
     {
         // check all face loop intersections for topological consistency. input should already be sorted.
+        if ( intersections.Count == 0 )
+            return new List<TopologyIntersection>();
 
         int last_loop_idx = intersections[0].LoopIdx;
         bool last_enters = intersections[0].ToolEdgeEnters;

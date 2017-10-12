@@ -49,6 +49,13 @@ public class CameraField : ICameraField
         set { m_loops = value; }
     }
 
+    public void DBG_Show( Color color )
+    {
+        foreach ( var loop in m_loops )
+            foreach ( var edge in loop )
+                edge.DBG_Show( color );
+    }
+
     private bool TestLeftHemiplane ( Vector2 vec2test, Vector2 line_dir )
     {
         return Vector2.Dot( vec2test, new Vector2( -line_dir.y, line_dir.x ) ) > 0;

@@ -93,6 +93,8 @@ public class CircleEdge : ICuttableEdge
                 edge_end = true;
                 break;
             }
+
+            res.normalized_t += Mathf.PI * 2;
         }
         if ( ! in_edge_found )
         {
@@ -136,18 +138,17 @@ public class CircleEdge : ICuttableEdge
         user.UseImpl( this );
     }
 
-    public CircleArc Data
-    {
-        get { return m_data; }
-    }
-
     public void DBG_Show ( Color color )
     {
         m_data.DBG_Show( color );
     }
 
-    private bool m_sense;
+    public CircleArc Data
+    { get { return m_data; } }
     private CircleArc m_data;
+    public bool Sense
+    { get { return m_sense; } }
+    private bool m_sense;
 }
 
 public class LineEdge : ICuttableEdge
@@ -179,7 +180,7 @@ public class LineEdge : ICuttableEdge
 
     public ICuttableEdge Cut ( float t, bool first_part )
     {
-        Vector2 pt = m_data.Eval( t );
+        Vector2 pt = Eval( t ).pt;
 
         return new LineEdge( new LineSegment
         {
@@ -222,6 +223,10 @@ public class LineEdge : ICuttableEdge
         m_data.DBG_Show( color );
     }
 
+    public LineSegment Data
+    { get { return m_data; } }
     private LineSegment m_data;
+    public bool Sense
+    { get { return m_sense; } }
     private bool m_sense;
 }
