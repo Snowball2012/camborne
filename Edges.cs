@@ -164,7 +164,7 @@ public class LineEdge : ICuttableEdge
         EdgeCP res = new EdgeCP();
 
         res.normalized_t = m_data.ClosestPointParam( pt );
-        if ( res.normalized_t < 0 || res.normalized_t > 1 )
+        if ( res.normalized_t <= 0 || res.normalized_t >= 1 )
             res.at_edge_end = res.normalized_t > 0;
 
         if ( !m_sense )
@@ -173,8 +173,12 @@ public class LineEdge : ICuttableEdge
 
             if ( res.at_edge_end.HasValue )
                 res.at_edge_end = !res.at_edge_end;
-        }        
+        }
 
+        if ( res.at_edge_end.HasValue )
+            res.normalized_t = res.at_edge_end.Value ? 1 : 0;
+
+        res.pt = Eval( res.normalized_t ).pt;
         return res;
     }
 
