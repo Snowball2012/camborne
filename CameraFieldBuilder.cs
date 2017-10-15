@@ -204,9 +204,9 @@ public class CameraFieldBuilder : MonoBehaviour {
         List<ICuttableEdge> res = new List<ICuttableEdge>();
         res.Add( edge1 );
 
-        for ( int i = 0; i < 5; ++i )
+        for ( int i = 0; i < 3; ++i )
         {
-            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 5 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 5 ).pt }, true ) );
+            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 3 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 3 ).pt }, true ) );
         }
         res.Add( edge2 );
 
@@ -260,11 +260,22 @@ public class CameraFieldBuilder : MonoBehaviour {
         for ( int i = 0; i < field.Loops.Count; ++i )
             used_loops.Add( false );
 
+        List<List<ICuttableEdge>> new_loops = new List<List<ICuttableEdge>>();
+
         if ( intersections.Count == 0 )
         {
             // test point on tool loop, if in field, add it to the field
-            if ( field.IsPointInside( edges2cut[0].Eval( 0 ).pt ) );
-            return field;
+            if ( field.IsPointInside( edges2cut[0].Eval( 0 ).pt ) )
+            {
+                new_loops.Add( edges2cut );
+                foreach ( var loop in field.Loops )
+                    new_loops.Add( loop );
+                return new CameraField( new_loops );
+            }
+            else
+            {
+                return field;
+            }
         }
 
         BopMap bop_map = new BopMap();
@@ -274,7 +285,6 @@ public class CameraFieldBuilder : MonoBehaviour {
             bop_map.tool_edges = edges2cut;
         };
 
-        List<List<ICuttableEdge>> new_loops = new List<List<ICuttableEdge>>();
         // find valid intersection and start from it
         bool unprocessed_found = false;
 
@@ -520,6 +530,16 @@ public class CameraFieldBuilder : MonoBehaviour {
         }
     }
 
+    private class TopologyIntersectionComparer_ByTarget : IComparer<TopologyIntersection>
+    {
+        public int Compare ( TopologyIntersection x, TopologyIntersection y )
+        {
+            if ( x.Geom.face_edge_param == y.Geom.face_edge_param )
+                return 0;
+            return x.Geom.face_edge_param < y.Geom.face_edge_param ? -1 : 1;
+        }
+    }
+
     private Dictionary<ICuttableEdge, IList<TopologyIntersection>> MakeIntersectionMap( IEnumerable<TopologyIntersection> intersections, IList<List<ICuttableEdge>> face_loops, IList<ICuttableEdge> tool )
     {
         var res = new Dictionary<ICuttableEdge, IList<TopologyIntersection>>();
@@ -558,6 +578,7 @@ public class CameraFieldBuilder : MonoBehaviour {
             var loop = field.Loops[loop_idx];
             for ( int edge_idx = 0; edge_idx < loop.Count; ++edge_idx )
             {
+                List<TopologyIntersection> sorted_is = new List<TopologyIntersection>();
                 for ( int tool_edge_idx = 0; tool_edge_idx < edges2cut.Count; ++tool_edge_idx )
                 {
                     var intersections = intersector.Intersect( loop[edge_idx], edges2cut[tool_edge_idx] );
@@ -566,9 +587,12 @@ public class CameraFieldBuilder : MonoBehaviour {
                         TopologyIntersection res = new TopologyIntersection(
                             loop_idx, edge_idx, tool_edge_idx, intersection );
 
-                        res_list.Add( res );
+                        sorted_is.Add( res );
                     }
                 }
+
+                sorted_is.Sort( new TopologyIntersectionComparer_ByTarget() );
+                res_list.AddRange( sorted_is );
             }
         }
 
