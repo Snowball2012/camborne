@@ -110,14 +110,15 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         arc.radius = primitive.radius;
         arc.center = primitive.center;
+        arc.t_start = 0;
+        arc.t_end = Mathf.PI * 2;
 
         var res = new List<ICuttableEdge>();
-        arc.t_start = Mathf.PI * 2;
-        for ( int i = 0; i < 4; ++i )
+
+        var circle_edge = new CircleEdge( arc, false );
+        for ( int i = 0; i < 20; ++i )
         {
-            arc.t_end = arc.t_start;
-            arc.t_start = Mathf.PI * ( ( 3.0f - i ) / 2.0f );
-            res.Add( new CircleEdge( arc, false ) );
+            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 20 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 20 ).pt }, true ) );
         }
 
         return res;
@@ -202,7 +203,11 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         List<ICuttableEdge> res = new List<ICuttableEdge>();
         res.Add( edge1 );
-        res.Add( circle_edge );
+
+        for ( int i = 0; i < 5; ++i )
+        {
+            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 5 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 5 ).pt }, true ) );
+        }
         res.Add( edge2 );
 
         return res;

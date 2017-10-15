@@ -81,15 +81,15 @@ public class Intersector
         var tool_data = tool.Data;
         Vector2 dir1 = target_data.p1 - target_data.p0;
         Vector2 dir2 = tool_data.p1 - tool_data.p0;
-
-        if ( Cross( dir1, dir2 ) == 0 ) // parallel or collinear
+        
+        if ( Mathf.Abs( Cross( dir1, dir2 ) ) == 0 ) // parallel or collinear
             return res;
 
         float target_t = Cross( tool_data.p0 - target_data.p0, dir2 / Cross( dir1, dir2 ) );
         float tool_t = Cross( target_data.p0 - tool_data.p0, dir1 / Cross( dir2, dir1 ) );
 
-        if ( target_t >= -1.0e-5 && target_t <= 1.0 + 1.0e-5
-            && tool_t >= -1.0e-5 && tool_t <= 1.0 + 1.0e-5 )
+        if ( target_t >= -1.0e-3 && target_t <= 1.0 + 1.0e-3
+            && tool_t >= -1.0e-3 && tool_t <= 1.0 + 1.0e-3 )
         {
             if ( !target.Sense )
                 target_t = 1.0f - target_t;
