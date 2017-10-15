@@ -119,8 +119,8 @@ public class Intersector
         {
             float base_param = tool_data.GetClosestPoint( target_data.Eval( line_closest_param ) );
             float spread = Mathf.Acos( line2center_dist / tool_data.radius );
-            if ( spread < 1.0e-7 )
-                spread = 1.0e-7f;
+            if ( spread < 1.0e-3 )
+                spread = 1.0e-3f;
 
             for ( int i = -1; i <= 1; i += 2 )
             {
@@ -199,7 +199,16 @@ public class Intersector
             }
 
             if ( res.Count == 2 )
-                throw new System.NotImplementedException();
+            {
+
+                if ( flip && res[0].face_edge_param > res[1].face_edge_param 
+                    || !flip && res[0].cut_param > res[1].cut_param )
+                {
+                    var temp = res[0];
+                    res[0] = res[1];
+                    res[1] = temp;
+                }
+            }
 
         }
         

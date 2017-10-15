@@ -21,6 +21,7 @@ public class CameraFieldBuilder : MonoBehaviour {
     public bool show_occlusion_fields = false;
     public bool show_player = false;
     public bool show_visibility_field = false;
+    public bool show_middle_zone = false;
     // Use this for initialization
     void Start () {
 		
@@ -35,10 +36,17 @@ public class CameraFieldBuilder : MonoBehaviour {
     void Update () {
         CirclePrimitive player_primitive = new CirclePrimitive();
         player_primitive.center = ConvertTo2d( player.gameObject.transform.position );
-        player_primitive.radius = player.radius;
+        player_primitive.radius = player.radius * player.gameObject.transform.localScale.magnitude;
 
-        if ( show_player)
+        CirclePrimitive target_primitive = new CirclePrimitive();
+        target_primitive.center = ConvertTo2d( target.gameObject.transform.position );
+        target_primitive.radius = target.radius * target.gameObject.transform.localScale.magnitude;
+
+        if ( show_player )
+        {
             player_primitive.DBG_Show( Color.red );
+            target_primitive.DBG_Show( Color.red );
+        }
 
         if ( show_occlusion_fields )
         {
@@ -52,7 +60,14 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         if ( show_visibility_field )
         {
-            Build( scene_loader.Scene, player_primitive, player_primitive ).DBG_Show( Color.magenta );
+            Build( scene_loader.Scene, player_primitive, target_primitive ).DBG_Show( Color.magenta );
+        }
+
+        if ( show_middle_zone )
+        {
+            var loop = MakeMiddleZone( player_primitive, target_primitive );
+            foreach ( var edge in loop )
+                edge.DBG_Show( Color.yellow );
         }
     }
 
@@ -65,6 +80,45 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         foreach ( var circle_obstacle in cameraScene.Circles )
             res = CutFromField( res, MakeOcclusionLoop( player, circle_obstacle ) );
+
+        res = CutFromField( res, MakeOcclusionLoop( player, target ) );
+
+        foreach ( var circle_obstacle in cameraScene.Circles )
+            res = CutFromField( res, MakeOcclusionLoop( target, circle_obstacle ) );
+
+        res = CutFromField( res, MakeMiddleZone( player, target ) );
+
+        return res;
+    }
+    
+    public CirclePrimitive MakeMiddlePrimitive( CirclePrimitive player, CirclePrimitive target )
+    {
+        CirclePrimitive res = new CirclePrimitive();
+        Vector2 p2t = target.center - player.center;
+        res.radius = ( ( p2t.magnitude + player.radius * 10 + target.radius ) / 2 );
+        Vector2 p2t_norm = p2t.normalized;
+        res.center = player.center - p2t_norm * player.radius * 5 + p2t_norm * res.radius;
+        res.radius *= 1.4f;
+        return res;
+    }
+
+    private List<ICuttableEdge> MakeMiddleZone ( CirclePrimitive player, CirclePrimitive target )
+    {
+        // 4 circle edges
+        CircleArc arc = new CircleArc();
+        CirclePrimitive primitive = MakeMiddlePrimitive( player, target );
+
+        arc.radius = primitive.radius;
+        arc.center = primitive.center;
+
+        var res = new List<ICuttableEdge>();
+        arc.t_start = Mathf.PI * 2;
+        for ( int i = 0; i < 4; ++i )
+        {
+            arc.t_end = arc.t_start;
+            arc.t_start = Mathf.PI * ( ( 3.0f - i ) / 2.0f );
+            res.Add( new CircleEdge( arc, false ) );
+        }
 
         return res;
     }
@@ -195,10 +249,18 @@ public class CameraFieldBuilder : MonoBehaviour {
         // Then make new loops.
         // TODO : loops without intersections 
 
-        IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( field, edges2cut ) );
+        IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( field, edges2cut ), edges2cut );
+
+        List<bool> used_loops = new List<bool>( field.Loops.Count );
+        for ( int i = 0; i < field.Loops.Count; ++i )
+            used_loops.Add( false );
 
         if ( intersections.Count == 0 )
+        {
+            // test point on tool loop, if in field, add it to the field
+            if ( field.IsPointInside( edges2cut[0].Eval( 0 ).pt ) );
             return field;
+        }
 
         BopMap bop_map = new BopMap();
         {
@@ -210,11 +272,14 @@ public class CameraFieldBuilder : MonoBehaviour {
         List<List<ICuttableEdge>> new_loops = new List<List<ICuttableEdge>>();
         // find valid intersection and start from it
         bool unprocessed_found = false;
+
+        int deadloop = 0;
         do
         {
             unprocessed_found = false;
             foreach ( var intersection in intersections )
             {
+                used_loops[intersection.LoopIdx] = true;
                 if ( intersection.Valid )
                 {
                     unprocessed_found = true;
@@ -222,8 +287,25 @@ public class CameraFieldBuilder : MonoBehaviour {
                     if ( new_loop != null )
                         new_loops.Add( new_loop );
                 }
+                if ( deadloop++ > 1000 )
+                {
+                    Debug.LogError( "deadloop" );
+                    break;
+                }
             }
+            if ( deadloop++ > 1000 )
+            {
+                Debug.LogError( "deadloop" );
+                break;
+            }
+
         } while ( unprocessed_found );
+
+        for ( int i = 0; i < used_loops.Count; ++i )
+        {
+            if ( !used_loops[i] )
+                new_loops.Add( field.Loops[i] );
+        }
 
         return new CameraField( new_loops );
     }
@@ -247,8 +329,14 @@ public class CameraFieldBuilder : MonoBehaviour {
         var res = new List<ICuttableEdge>();
 
         TopologyIntersection last = start_from;
+        int deadloop = 0;
         do
         {
+            if ( deadloop++ > 1000 )
+            {
+                Debug.LogError( "deadloop" );
+                break;
+            }
             LoopSegment seg = MakeLoopSegment( last, map );
             last = seg.end;
             res.AddRange( seg.edges );
@@ -332,6 +420,8 @@ public class CameraFieldBuilder : MonoBehaviour {
         var seg_edges = new List<ICuttableEdge>();
         seg.end = null;
         edge_iterator.Reset();
+
+        int deadloop = 0;
         do
         {
             var cur_edge = edge_iterator.Current;
@@ -375,6 +465,12 @@ public class CameraFieldBuilder : MonoBehaviour {
             if ( end != null )
             {
                 seg.end = end;
+                break;
+            }
+
+            if ( deadloop++ > 1000 )
+            {
+                Debug.Log( "deadloop" );
                 break;
             }
 
@@ -474,15 +570,21 @@ public class CameraFieldBuilder : MonoBehaviour {
         return res_list;
     }
 
-    private List<TopologyIntersection> FilterIntersections ( IList<TopologyIntersection> intersections )
+    private List<TopologyIntersection> FilterIntersections ( IList<TopologyIntersection> intersections, IList<ICuttableEdge> tool )
     {
         // check all face loop intersections for topological consistency. input should already be sorted.
         if ( intersections.Count == 0 )
             return new List<TopologyIntersection>();
 
+        IDictionary<ICuttableEdge, List<TopologyIntersection>> edge2intersections = new Dictionary<ICuttableEdge, List<TopologyIntersection>>();
+
         int last_loop_idx = intersections[0].LoopIdx;
         bool last_enters = intersections[0].ToolEdgeEnters;
         bool first_in_loop_enters = last_enters;
+
+
+        edge2intersections[tool[intersections[0].ToolEdgeIdx]] = new List<TopologyIntersection>();
+        edge2intersections[tool[intersections[0].ToolEdgeIdx]].Add( intersections[0] );
 
         int items_filtered = 0;
         for ( int i = 1; i < intersections.Count; ++i )
@@ -509,12 +611,59 @@ public class CameraFieldBuilder : MonoBehaviour {
                     items_filtered++;
                 }
             }
+
+            if ( intersection.Valid )
+            {
+                if ( ! edge2intersections.ContainsKey( tool[intersection.ToolEdgeIdx] ) )
+                    edge2intersections[tool[intersection.ToolEdgeIdx]] = new List<TopologyIntersection>();
+
+                edge2intersections[tool[intersection.ToolEdgeIdx]].Add( intersection );
+            }
             last_enters = tool_edge_enters;
         }
         // check last loop
-        if ( last_enters == first_in_loop_enters && intersections.Count > 0 )
+        if ( last_enters == first_in_loop_enters )
         {
             intersections[intersections.Count - 1].Valid = false;
+            items_filtered++;
+        }
+
+        // now filter by tool
+        bool first_init = true;
+        TopologyIntersection first_tool_is = null;
+        foreach ( var edge in tool )
+        {
+            if ( ! edge2intersections.ContainsKey( edge ) )
+                continue;
+
+            edge2intersections[edge].Sort( new TopologyIntersectionComparer() );
+
+            foreach ( var intersection in edge2intersections[edge] )
+            {
+                if ( !intersection.Valid )
+                    continue;
+                if ( first_init )
+                {
+                    first_in_loop_enters = last_enters = intersection.ToolEdgeEnters;
+                    first_init = false;
+                    first_tool_is = intersection;
+                }
+                else
+                {
+                    bool tool_enters = intersection.ToolEdgeEnters;
+                    if ( tool_enters == last_enters ) // inconsistent
+                    {
+                        intersection.Valid = false;
+                        items_filtered++;
+                    }
+                    last_enters = tool_enters;
+                }
+            }
+        }
+
+        if ( last_enters == first_in_loop_enters && first_tool_is != null )
+        {
+            first_tool_is.Valid = false;
             items_filtered++;
         }
 

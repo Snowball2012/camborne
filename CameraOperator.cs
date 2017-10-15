@@ -59,7 +59,7 @@ public class DenormalizedHermiteSpline
 // Simple hermite spline - based camera operator. Takes destination point, direction vector and target FoV, builds hermite spline to reach desired state and moves the camera along the curve 
 public class CameraOperator : MonoBehaviour
 {
-    public Transform Player; // temp dbg anchor
+    public Transform lookat; // temp dbg anchor
 
     void Start ( )
     {
@@ -82,7 +82,7 @@ public class CameraOperator : MonoBehaviour
         }
 
 
-        transform.LookAt(Player);
+        transform.LookAt( lookat );
         // Todo: change direction and FoV
     }
 
