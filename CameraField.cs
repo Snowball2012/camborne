@@ -34,7 +34,7 @@ public class CameraField : ICameraField
         int first_pos = cp.edge_cp.at_edge_end.Value ? cp.pos_in_loop : cp.pos_in_loop - 1;
         int second_pos = ( first_pos + 1 ) % cp.loop.Count;
         if ( first_pos < 0 )
-            first_pos = cp.loop.Count;
+            first_pos = cp.loop.Count - 1;
 
         return IsPointInsideByVertex( pt - cp.edge_cp.pt,
             cp.loop[first_pos].Eval( 1.0f ).dir,
