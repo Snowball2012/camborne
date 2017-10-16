@@ -83,8 +83,8 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         res = CutFromField( res, MakeOcclusionLoop( player, target ) );
 
-        foreach ( var circle_obstacle in cameraScene.Circles )
-            res = CutFromField( res, MakeOcclusionLoop( target, circle_obstacle ) );
+        //foreach ( var circle_obstacle in cameraScene.Circles )
+        //    res = CutFromField( res, MakeOcclusionLoop( target, circle_obstacle ) );
 
         res = CutFromField( res, MakeMiddleZone( player, target ) );
 
@@ -116,9 +116,9 @@ public class CameraFieldBuilder : MonoBehaviour {
         var res = new List<ICuttableEdge>();
 
         var circle_edge = new CircleEdge( arc, false );
-        for ( int i = 0; i < 20; ++i )
+        for ( int i = 0; i < 100; ++i )
         {
-            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 20 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 20 ).pt }, true ) );
+            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 100 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 100 ).pt }, true ) );
         }
 
         return res;
@@ -204,9 +204,9 @@ public class CameraFieldBuilder : MonoBehaviour {
         List<ICuttableEdge> res = new List<ICuttableEdge>();
         res.Add( edge1 );
 
-        for ( int i = 0; i < 3; ++i )
+        for ( int i = 0; i < 5; ++i )
         {
-            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 3 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 3 ).pt }, true ) );
+            res.Add( new LineEdge( new LineSegment { p0 = circle_edge.Eval( 1.0f * i / 5 ).pt, p1 = circle_edge.Eval( 1.0f * ( i + 1 ) / 5 ).pt }, true ) );
         }
         res.Add( edge2 );
 
@@ -246,6 +246,11 @@ public class CameraFieldBuilder : MonoBehaviour {
         public Intersection Geom
         { get { return m_geom; } }
         Intersection m_geom;
+
+        public void SetCutParam( float cut_param )
+        {
+            m_geom.cut_param = cut_param;
+        }
     }
 
     private CameraField CutFromField ( CameraField field, List<ICuttableEdge> edges2cut )
@@ -254,7 +259,7 @@ public class CameraFieldBuilder : MonoBehaviour {
         // Then make new loops.
         // TODO : loops without intersections 
 
-        IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( field, edges2cut ), edges2cut );
+        IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( field, edges2cut ), field, edges2cut );
 
         List<bool> used_loops = new List<bool>( field.Loops.Count );
         for ( int i = 0; i < field.Loops.Count; ++i )
@@ -599,7 +604,7 @@ public class CameraFieldBuilder : MonoBehaviour {
         return res_list;
     }
 
-    private List<TopologyIntersection> FilterIntersections ( IList<TopologyIntersection> intersections, IList<ICuttableEdge> tool )
+    private List<TopologyIntersection> FilterIntersections ( IList<TopologyIntersection> intersections, CameraField field, IList<ICuttableEdge> tool )
     {
         // check all face loop intersections for topological consistency. input should already be sorted.
         if ( intersections.Count == 0 )
@@ -611,6 +616,55 @@ public class CameraFieldBuilder : MonoBehaviour {
         bool last_enters = intersections[0].ToolEdgeEnters;
         bool first_in_loop_enters = last_enters;
 
+        {
+            int cur_loop_first_edge_idx = 0;
+
+            // 1. Go through every loop and move tool param if ambigious
+            for ( int i = 1; i <= intersections.Count; ++i )
+            {
+                TopologyIntersection intersection = null;
+                TopologyIntersection prev = intersections[i - 1];
+
+                if ( i == intersections.Count )
+                {
+                    intersection = intersections[cur_loop_first_edge_idx];
+                }
+                else
+                {
+                    intersection = intersections[i];
+                    int cur_loop = intersection.LoopIdx;
+
+                    if ( cur_loop != last_loop_idx )
+                    {
+                        intersection = intersections[cur_loop_first_edge_idx];
+                        cur_loop_first_edge_idx = i;
+                        last_loop_idx = cur_loop;
+                    }
+                    else
+                    {
+                        intersection = intersections[i];
+                    }
+                }
+                if ( ( intersection.ToolEdgeIdx == prev.ToolEdgeIdx )
+                    && ( ( prev.EdgeIdx + 1 ) % field.Loops[prev.LoopIdx].Count == intersection.EdgeIdx )
+                    && ( prev.ToolEdgeEnters != intersection.ToolEdgeEnters ) )
+                {
+                    ICuttableEdge first_edge = field.Loops[prev.LoopIdx][prev.EdgeIdx];
+                    ICuttableEdge second_edge = field.Loops[intersection.LoopIdx][intersection.EdgeIdx];
+                    bool tool_is_order = CameraField.TestLeftHemiplane( second_edge.Eval( 0 ).dir, first_edge.Eval( 1 ).dir ) == prev.ToolEdgeEnters;
+                    if ( tool_is_order != ( prev.Geom.cut_param < intersection.Geom.cut_param ) )
+                    {
+                        float temp = prev.Geom.cut_param;
+                        prev.SetCutParam( intersection.Geom.cut_param );
+                        intersection.SetCutParam( temp );
+                    }
+                }
+            }
+        }
+
+        last_loop_idx = intersections[0].LoopIdx;
+        last_enters = intersections[0].ToolEdgeEnters;
+        first_in_loop_enters = last_enters;
 
         edge2intersections[tool[intersections[0].ToolEdgeIdx]] = new List<TopologyIntersection>();
         edge2intersections[tool[intersections[0].ToolEdgeIdx]].Add( intersections[0] );

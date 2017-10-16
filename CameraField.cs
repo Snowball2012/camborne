@@ -56,7 +56,7 @@ public class CameraField : ICameraField
                 edge.DBG_Show( color );
     }
 
-    private bool TestLeftHemiplane ( Vector2 vec2test, Vector2 line_dir )
+    public static bool TestLeftHemiplane ( Vector2 vec2test, Vector2 line_dir )
     {
         return Vector2.Dot( vec2test, new Vector2( -line_dir.y, line_dir.x ) ) > 0;
     }
