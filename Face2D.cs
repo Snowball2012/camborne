@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-public interface ICameraField
+public interface IFace2D
 {
     Vector2 GetClosestPointOnBorder ( Vector2 pt );
     bool IsPointInside ( Vector2 pt );
 }
 
-public class CameraField : ICameraField
+public class Face2D : IFace2D
 {
-    public CameraField ( List<List<ICuttableEdge>> loops )
+    public Face2D ( List<List<ICuttableEdge>> loops )
     {
         m_loops = loops;
     }
@@ -56,22 +56,18 @@ public class CameraField : ICameraField
                 edge.DBG_Show( color );
     }
 
-    public static bool TestLeftHemiplane ( Vector2 vec2test, Vector2 line_dir )
-    {
-        return Vector2.Dot( vec2test, new Vector2( -line_dir.y, line_dir.x ) ) > 0;
-    }
 
     private bool IsPointInsideByEdge ( Vector2 pt, IEdge edge, EdgeCP cp )
     {
         EvalRes eval = edge.Eval( cp.normalized_t );
-        return TestLeftHemiplane( pt - cp.pt, eval.dir );
+        return Utils.TestLeftHemiplane( pt - cp.pt, eval.dir );
     }
 
     private bool IsPointInsideByVertex ( Vector2 pt2v, Vector2 dir1, Vector2 dir2 )
     {
         // either in -dir1 right quarter, dir2 left quarter or in dir1, dir2 left hemiplane
-        bool hemiplane1 = TestLeftHemiplane( pt2v, dir1 );
-        bool hemiplane2 = TestLeftHemiplane( pt2v, dir2 );
+        bool hemiplane1 = Utils.TestLeftHemiplane( pt2v, dir1 );
+        bool hemiplane2 = Utils.TestLeftHemiplane( pt2v, dir2 );
 
         if ( hemiplane1 && hemiplane2 )
             return true;

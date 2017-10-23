@@ -2,20 +2,25 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public struct Intersection
+{
+    public float face_edge_param;
+    public float cut_param;
+    public bool tool_edge_enters;
+}
 
 public class Intersector
 {
-    private class ImplCollector : IEdgeImplementationUser
+    private class EdgeVisitor : IEdgeVisitor
     {
-        public ImplCollector( Intersector intersector )
+        public EdgeVisitor( Intersector intersector )
         {
             m_intersector = intersector;
             m_e1c = null;
             m_e1l = null;
         }
-        Intersector m_intersector;
 
-        public void UseImpl ( CircleEdge circle )
+        public void Visit ( CircleEdge circle )
         {
             if ( m_e1c != null || m_e1l != null )
             {
@@ -30,7 +35,7 @@ public class Intersector
             }
         }
 
-        public void UseImpl ( LineEdge line )
+        public void Visit ( LineEdge line )
         {
             if ( m_e1c != null || m_e1l != null )
             {
@@ -45,33 +50,25 @@ public class Intersector
             }
         }
         
-        CircleEdge m_e1c;
-        LineEdge m_e1l;
-
         public List<Intersection> Res
         { get { return m_res; } }
+
+        Intersector m_intersector;
+        CircleEdge m_e1c;
+        LineEdge m_e1l;
         List<Intersection> m_res;
     }
 
     public List<Intersection> Intersect ( IEdge target, IEdge tool )
     {
-        ImplCollector ic = new ImplCollector( this );
-        target.UseImpl( ic );
-        tool.UseImpl( ic );
+        EdgeVisitor ic = new EdgeVisitor( this );
+        target.OnVisit( ic );
+        tool.OnVisit( ic );
 
         return ic.Res;
     }
 
-    private float Cross ( Vector2 v1, Vector2 v2 )
-    {
-        return v1.x * v2.y - v1.y * v2.x;
-    }
-
-    private bool TestLeftHemiplane ( Vector2 vec2test, Vector2 line_dir )
-    {
-        return Vector2.Dot( vec2test, new Vector2( -line_dir.y, line_dir.x ) ) > 0;
-    }
-
+    
     public List<Intersection> Intersect ( LineEdge target, LineEdge tool )
     {
         var res = new List<Intersection>();
@@ -82,11 +79,11 @@ public class Intersector
         Vector2 dir1 = target_data.p1 - target_data.p0;
         Vector2 dir2 = tool_data.p1 - tool_data.p0;
         
-        if ( Mathf.Abs( Cross( dir1, dir2 ) ) == 0 ) // parallel or collinear
+        if ( Mathf.Abs( Utils.Cross( dir1, dir2 ) ) == 0 ) // parallel or collinear
             return res;
 
-        float target_t = Cross( tool_data.p0 - target_data.p0, dir2 / Cross( dir1, dir2 ) );
-        float tool_t = Cross( target_data.p0 - tool_data.p0, dir1 / Cross( dir2, dir1 ) );
+        float target_t = Utils.Cross( tool_data.p0 - target_data.p0, dir2 / Utils.Cross( dir1, dir2 ) );
+        float tool_t = Utils.Cross( target_data.p0 - tool_data.p0, dir1 / Utils.Cross( dir2, dir1 ) );
 
         if ( target_t >= -1.0e-3 && target_t <= 1.0 + 1.0e-3
             && tool_t >= -1.0e-3 && tool_t <= 1.0 + 1.0e-3 )
@@ -96,10 +93,12 @@ public class Intersector
             if ( !tool.Sense )
                 tool_t = 1.0f - tool_t;
 
-            Intersection i = new Intersection();
-            i.face_edge_param = target_t;
-            i.cut_param = tool_t;
-            i.tool_edge_enters = TestLeftHemiplane( dir2, dir1 ) == ( target.Sense == tool.Sense );
+            Intersection i = new Intersection
+            {
+                face_edge_param = target_t,
+                cut_param = tool_t,
+                tool_edge_enters = Utils.TestLeftHemiplane( dir2, dir1 ) == ( target.Sense == tool.Sense )
+            };
             res.Add( i );
         }
 
@@ -160,9 +159,11 @@ public class Intersector
 
                     if ( in_edge_found || min_dist < 1.0e-5 )
                     {
-                        Intersection intersection = new Intersection();
-                        intersection.face_edge_param = line_param;
-                        intersection.cut_param = Mathf.InverseLerp( tool_data.t_start, tool_data.t_end, corrected_curve_param );
+                        Intersection intersection = new Intersection
+                        {
+                            face_edge_param = line_param,
+                            cut_param = Mathf.InverseLerp( tool_data.t_start, tool_data.t_end, corrected_curve_param )
+                        };
                         if ( !target.Sense )
                             intersection.face_edge_param = 1 - intersection.face_edge_param;
                         if ( !tool.Sense )
@@ -170,11 +171,11 @@ public class Intersector
 
                         if ( !flip )
                         {
-                            intersection.tool_edge_enters = TestLeftHemiplane( line2center, target_data.p1 - target_data.p0 );
+                            intersection.tool_edge_enters = Utils.TestLeftHemiplane( line2center, target_data.p1 - target_data.p0 );
                         }
                         else
                         {
-                            intersection.tool_edge_enters = !TestLeftHemiplane( line2center, target_data.p1 - target_data.p0 );
+                            intersection.tool_edge_enters = !Utils.TestLeftHemiplane( line2center, target_data.p1 - target_data.p0 );
                         }
 
                         {
@@ -216,7 +217,6 @@ public class Intersector
     }
     public List<Intersection> Intersect ( CircleEdge target, CircleEdge tool )
     {
-        return new List<Intersection>();
         throw new System.NotImplementedException();
     }
     

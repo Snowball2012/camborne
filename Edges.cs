@@ -15,10 +15,10 @@ public struct EdgeCP
     public bool? at_edge_end;
 }
 
-public interface IEdgeImplementationUser
+public interface IEdgeVisitor
 {
-    void UseImpl ( CircleEdge circle );
-    void UseImpl ( LineEdge line );
+    void Visit ( CircleEdge circle );
+    void Visit ( LineEdge line );
 }
 
 public interface IEdge
@@ -26,7 +26,7 @@ public interface IEdge
     EvalRes Eval ( float normalized_t );
     EdgeCP GetClosestPoint ( Vector2 pt );
     float GetLen ( );
-    void UseImpl ( IEdgeImplementationUser user );
+    void OnVisit ( IEdgeVisitor visitor );
 }
 
 public interface ICuttableEdge : IEdge
@@ -59,9 +59,11 @@ public class CircleEdge : ICuttableEdge
             t = 1.0f - t;
         float unclamped_t = Mathf.Lerp( m_data.t_start, m_data.t_end, t );
 
-        EvalRes res = new EvalRes();
-        res.pt = m_data.Eval( unclamped_t );
-        res.dir = m_data.EvalDir( unclamped_t );
+        EvalRes res = new EvalRes
+        {
+            pt = m_data.Eval( unclamped_t ),
+            dir = m_data.EvalDir( unclamped_t )
+        };
         if ( ! m_sense )
             res.dir *= -1;
 
@@ -70,8 +72,10 @@ public class CircleEdge : ICuttableEdge
 
     public EdgeCP GetClosestPoint ( Vector2 pt )
     {
-        EdgeCP res = new EdgeCP();
-        res.normalized_t = m_data.GetClosestPoint( pt );
+        EdgeCP res = new EdgeCP
+        {
+            normalized_t = m_data.GetClosestPoint( pt )
+        };
 
         bool in_edge_found = false;
         bool edge_end = false;
@@ -113,7 +117,7 @@ public class CircleEdge : ICuttableEdge
         return res;
     }
 
-    public ICuttableEdge Cut ( float t, bool first_part )
+    public ICuttableEdge Cut ( float t, bool leave_first_part )
     {
         if ( !m_sense )
             t = 1 - t;
@@ -123,8 +127,8 @@ public class CircleEdge : ICuttableEdge
         {
             center = m_data.center,
             radius = m_data.radius,
-            t_start = first_part == m_sense ? m_data.t_start : unclamped_t,
-            t_end = first_part == m_sense ? unclamped_t : m_data.t_end
+            t_start = leave_first_part == m_sense ? m_data.t_start : unclamped_t,
+            t_end = leave_first_part == m_sense ? unclamped_t : m_data.t_end
         }, m_sense );
     }
 
@@ -133,9 +137,9 @@ public class CircleEdge : ICuttableEdge
         return ( m_data.t_end - m_data.t_start ) * m_data.radius;
     }
 
-    public void UseImpl ( IEdgeImplementationUser user )
+    public void OnVisit ( IEdgeVisitor user )
     {
-        user.UseImpl( this );
+        user.Visit( this );
     }
 
     public void DBG_Show ( Color color )
@@ -145,9 +149,10 @@ public class CircleEdge : ICuttableEdge
 
     public CircleArc Data
     { get { return m_data; } }
-    private CircleArc m_data;
     public bool Sense
     { get { return m_sense; } }
+
+    private CircleArc m_data;
     private bool m_sense;
 }
 
@@ -161,9 +166,10 @@ public class LineEdge : ICuttableEdge
 
     public EdgeCP GetClosestPoint ( Vector2 pt )
     {
-        EdgeCP res = new EdgeCP();
-
-        res.normalized_t = m_data.ClosestPointParam( pt );
+        EdgeCP res = new EdgeCP
+        {
+            normalized_t = m_data.ClosestPointParam( pt )
+        };
         if ( res.normalized_t <= 0 || res.normalized_t >= 1 )
             res.at_edge_end = res.normalized_t > 0;
 
@@ -198,9 +204,9 @@ public class LineEdge : ICuttableEdge
         return ( m_data.p0 - m_data.p1 ).magnitude;
     }
 
-    public void UseImpl ( IEdgeImplementationUser user )
+    public void OnVisit ( IEdgeVisitor user )
     {
-        user.UseImpl( this );
+        user.Visit( this );
     }
 
     public EvalRes Eval ( float t )
@@ -208,16 +214,11 @@ public class LineEdge : ICuttableEdge
         if ( !m_sense )
             t = 1.0f - t;
 
-        EvalRes res = new EvalRes();
-
-        res.pt = m_data.p0 * ( 1.0f - t ) + m_data.p1 * t;
-
-        if ( m_sense )
-            res.dir = m_data.p1 - m_data.p0;
-        else
-            res.dir = m_data.p0 - m_data.p1;
-
-        res.dir.Normalize();
+        EvalRes res = new EvalRes
+        {
+            pt = m_data.p0 * ( 1.0f - t ) + m_data.p1 * t,
+            dir = ( m_sense ? res.dir = m_data.p1 - m_data.p0 : m_data.p0 - m_data.p1 ).normalized
+        };
 
         return res;
     }
@@ -229,8 +230,9 @@ public class LineEdge : ICuttableEdge
 
     public LineSegment Data
     { get { return m_data; } }
-    private LineSegment m_data;
     public bool Sense
     { get { return m_sense; } }
+
+    private LineSegment m_data;
     private bool m_sense;
 }

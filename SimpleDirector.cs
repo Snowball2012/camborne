@@ -27,7 +27,7 @@ public class SimpleDirector : MonoBehaviour {
         target_primitive.center = ConvertTo2d( target.gameObject.transform.position );
         target_primitive.radius = target.radius * target.gameObject.transform.localScale.magnitude;
 
-        CameraField field = field_builder.Build( field_builder.scene_loader.Scene, player_primitive, target_primitive );
+        Face2D field = field_builder.Build( field_builder.scene_loader.Scene, player_primitive, target_primitive );
 
         Vector2 anchor_pos = ConvertTo2d( anchor.position );
         if ( ! field.IsPointInside( anchor_pos ) )
