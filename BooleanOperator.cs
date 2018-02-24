@@ -7,6 +7,30 @@ public class BooleanOperator
 {
     private const int DeadloopMaxIters = 1000;
 
+    private ICetonia m_dbg = null;
+
+    private void EnableDebug ( )
+    {
+        var go = GameObject.Find( "cetonia" );
+        if ( go != null )
+            m_dbg = go.GetComponent<Cetonia>();
+    }
+
+    private void SendTestLine()
+    {
+        DBGLine2d test_line;
+        test_line.thickness = 0.1;
+        test_line.p1 = new Vector2( 0, 0 );
+        test_line.p2 = new Vector2( 1, 1 );
+        test_line.color = Color.red;
+        if ( m_dbg != null )
+        {
+            m_dbg.StartRecording();
+            m_dbg.SendLine( test_line );
+            m_dbg.Flush();
+        }
+    }
+
     public Face2D Intersect( Face2D target, List<ICuttableEdge> tool )
     {
         // 1. for each edge determine if intersection number is even, then find these intersections.

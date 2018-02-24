@@ -8,6 +8,7 @@ public class CameraFieldBuilder : MonoBehaviour {
     public CameraSceneLoader scene_loader;
     public CapsuleCollider player;
     public CapsuleCollider target;
+    
 
     public bool show_occlusion_fields = false;
     public bool show_player = false;
@@ -15,7 +16,6 @@ public class CameraFieldBuilder : MonoBehaviour {
     public bool show_middle_zone = false;
     // Use this for initialization
     void Start () {
-		
 	}
 
 
@@ -74,8 +74,8 @@ public class CameraFieldBuilder : MonoBehaviour {
 
         res = bop.Intersect( res, MakeOcclusionLoop( player, target ) );
 
-        //foreach ( var circle_obstacle in cameraScene.Circles )
-        //    res = CutFromField( res, MakeOcclusionLoop( target, circle_obstacle ) );
+        foreach ( var circle_obstacle in cameraScene.Circles )
+            res = bop.Intersect( res, MakeOcclusionLoop( target, circle_obstacle ) );
 
         res = bop.Intersect( res, MakeMiddleZone( player, target ) );
 
@@ -201,5 +201,5 @@ public class CameraFieldBuilder : MonoBehaviour {
         res.Add( edge2 );
 
         return res;
-    }   
+    }  
 }
