@@ -32,7 +32,11 @@ public interface IEdge
 public interface ICuttableEdge : IEdge
 {
     ICuttableEdge Cut ( float t, bool first_part );
+
+    void Connect ( ICuttableEdge other_edge, bool at_start );
+
     void DBG_Show ( Color color );
+    DBGLine2d DBG_ShowCetonia ( Color color, float thickness );
 }
 
 public class CircleEdge : ICuttableEdge
@@ -147,6 +151,16 @@ public class CircleEdge : ICuttableEdge
         m_data.DBG_Show( color );
     }
 
+    public DBGLine2d DBG_ShowCetonia ( Color color, float thickness )
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void Connect ( ICuttableEdge other_edge, bool at_start )
+    {
+        throw new System.NotImplementedException();
+    }
+
     public CircleArc Data
     { get { return m_data; } }
     public bool Sense
@@ -228,8 +242,54 @@ public class LineEdge : ICuttableEdge
         m_data.DBG_Show( color );
     }
 
+    public DBGLine2d DBG_ShowCetonia ( Color color, float thickness )
+    {
+        DBGLine2d line2d = new DBGLine2d();
+        line2d.color = color;
+        line2d.p1 = m_data.p0;
+        line2d.p2 = m_data.p1;
+        line2d.thickness = thickness;
+        return line2d;
+    }
+
+    private class EdgeVisitor : IEdgeVisitor
+    {
+        private LineEdge m_edge;
+        private bool at_begin;
+        public EdgeVisitor( LineEdge edge, bool at_begin )
+        {
+            m_edge = edge;
+            this.at_begin = at_begin;
+        }
+
+        public void Visit ( CircleEdge circle )
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public void Visit ( LineEdge line )
+        {
+            var data = m_edge.Data;
+
+            if ( at_begin )
+                data.p0 = line.Data.p1;
+            else
+                data.p1 = line.Data.p0;
+
+            m_edge.Data = data;
+        }
+    }
+
+    public void Connect ( ICuttableEdge other_edge, bool at_start )
+    {
+        other_edge.OnVisit( new EdgeVisitor( this, at_start ) );
+    }
+
     public LineSegment Data
-    { get { return m_data; } }
+    {
+        get { return m_data; }
+        set { m_data = value; }
+    }
     public bool Sense
     { get { return m_sense; } }
 

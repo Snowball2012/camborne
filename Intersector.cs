@@ -4,8 +4,8 @@ using UnityEngine;
 
 public struct Intersection
 {
-    public float face_edge_param;
-    public float cut_param;
+    public Rational face_edge_param;
+    public Rational cut_param;
     public bool tool_edge_enters;
 }
 
@@ -76,28 +76,39 @@ public class Intersector
         // intersect corresponding lines. 1 or zero intersections
         var target_data = target.Data;
         var tool_data = tool.Data;
-        Vector2 dir1 = target_data.p1 - target_data.p0;
-        Vector2 dir2 = tool_data.p1 - tool_data.p0;
-        
-        if ( Mathf.Abs( Utils.Cross( dir1, dir2 ) ) == 0 ) // parallel or collinear
+
+        Vector2R target_p0 = new Vector2R( target_data.p0 );
+        Vector2R target_p1 = new Vector2R( target_data.p1 );
+
+        Vector2R tool_p0 = new Vector2R( tool_data.p0 );
+        Vector2R tool_p1 = new Vector2R( tool_data.p1 );
+
+        Vector2R dir1 = target_p1 - target_p0;
+        Vector2R dir2 = tool_p1 - tool_p0;
+
+        if ( dir1.SqrMagnitude == Rational.FromLong( 0 )
+            || dir2.SqrMagnitude == Rational.FromLong( 0 ) ) // one vector is degenerate
             return res;
 
-        float target_t = Utils.Cross( tool_data.p0 - target_data.p0, dir2 / Utils.Cross( dir1, dir2 ) );
-        float tool_t = Utils.Cross( target_data.p0 - tool_data.p0, dir1 / Utils.Cross( dir2, dir1 ) );
+        if ( Vector2R.Cross( dir1, dir2 ) == new Rational( 0 ) ) // parallel or collinear
+            return res;
 
-        if ( target_t >= -1.0e-3 && target_t <= 1.0 + 1.0e-3
-            && tool_t >= -1.0e-3 && tool_t <= 1.0 + 1.0e-3 )
+        Rational target_t = Vector2R.Cross( tool_p0 - target_p0, dir2 / Vector2R.Cross( dir1, dir2 ) );
+        Rational tool_t = Vector2R.Cross( target_p0 - tool_p0, dir1 / Vector2R.Cross( dir2, dir1 ) );
+
+        if ( target_t >= Rational.FromLong( 0 ) && target_t <= Rational.FromLong( 1 )
+            && tool_t >= Rational.FromLong( 0 ) && tool_t <= Rational.FromLong( 1 ) )
         {
             if ( !target.Sense )
-                target_t = 1.0f - target_t;
+                target_t = Rational.FromLong( 1 ) - target_t;
             if ( !tool.Sense )
-                tool_t = 1.0f - tool_t;
+                tool_t = Rational.FromLong( 1 ) - tool_t;
 
             Intersection i = new Intersection
             {
                 face_edge_param = target_t,
                 cut_param = tool_t,
-                tool_edge_enters = Utils.TestLeftHemiplane( dir2, dir1 ) == ( target.Sense == tool.Sense )
+                tool_edge_enters = Vector2R.TestLeftHemiplane( dir2, dir1 ) == ( target.Sense == tool.Sense )
             };
             res.Add( i );
         }
@@ -106,6 +117,7 @@ public class Intersector
     }
     public List<Intersection> Intersect ( LineEdge target, CircleEdge tool, bool flip )
     {
+        /*
         var target_data = target.Data;
         var tool_data = tool.Data;
 
@@ -212,8 +224,8 @@ public class Intersector
             }
 
         }
-        
-        return res;
+        */
+        throw new System.NotImplementedException();
     }
     public List<Intersection> Intersect ( CircleEdge target, CircleEdge tool )
     {

@@ -39,7 +39,7 @@ public class CameraFieldBuilder : MonoBehaviour {
         {
             foreach ( var circle_obstacle in scene_loader.Scene.Circles )
             {
-                var loop = MakeOcclusionLoop( player_primitive, circle_obstacle );
+                var loop = MakeOcclusionLoop( player_primitive, circle_obstacle, 0.0f );
                 foreach ( var edge in loop )
                     edge.DBG_Show( Color.blue );
             }
@@ -70,12 +70,12 @@ public class CameraFieldBuilder : MonoBehaviour {
         BooleanOperator bop = new BooleanOperator();
 
         foreach ( var circle_obstacle in cameraScene.Circles )
-            res = bop.Intersect( res, MakeOcclusionLoop( player, circle_obstacle ) );
+            res = bop.Intersect( res, MakeOcclusionLoop( player, circle_obstacle, -0.1f ) );
 
-        res = bop.Intersect( res, MakeOcclusionLoop( player, target ) );
+        res = bop.Intersect( res, MakeOcclusionLoop( player, target, 0.0f ) );
 
         foreach ( var circle_obstacle in cameraScene.Circles )
-            res = bop.Intersect( res, MakeOcclusionLoop( target, circle_obstacle ) );
+            res = bop.Intersect( res, MakeOcclusionLoop( target, circle_obstacle, 0.1f ) );
 
         res = bop.Intersect( res, MakeMiddleZone( player, target ) );
 
@@ -157,7 +157,7 @@ public class CameraFieldBuilder : MonoBehaviour {
         return new Face2D( new List<List<ICuttableEdge>> { start_loop } );
     }
 
-    private List<ICuttableEdge> MakeOcclusionLoop ( CirclePrimitive player, CirclePrimitive obstacle )
+    private List<ICuttableEdge> MakeOcclusionLoop ( CirclePrimitive player, CirclePrimitive obstacle, float radius_shift )
     {
         Vector2 center2center = player.center - obstacle.center;
 
@@ -167,7 +167,7 @@ public class CameraFieldBuilder : MonoBehaviour {
             new CircleArc
             {
                 center = obstacle.center,
-                radius = obstacle.radius,
+                radius = obstacle.radius * ( 1 + radius_shift ),
                 t_start = cp_param - param_spread,
                 t_end = cp_param + param_spread
             },

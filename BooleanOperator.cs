@@ -31,13 +31,31 @@ public class BooleanOperator
         }
     }
 
+    private void DBG_ShowFaceCetonia( Face2D face, Color color )
+    {
+        m_dbg.StartRecording();
+
+        foreach ( var loop in face.Loops )
+            DBG_ShowLoopCetonia( loop, color, 0.05f );
+
+        m_dbg.Flush();
+    }
+
+    private void DBG_ShowLoopCetonia( IList<ICuttableEdge> loop, Color color, float thickness )
+    {
+        foreach ( var edge in loop )
+        {
+            m_dbg.SendLine( edge.DBG_ShowCetonia( color, thickness ) );
+        }
+    }
+
     public Face2D Intersect( Face2D target, List<ICuttableEdge> tool )
     {
         // 1. for each edge determine if intersection number is even, then find these intersections.
         // Then make new loops.
         // TODO : loops without intersections 
 
-        IList<TopologyIntersection> intersections = FilterIntersections( FindAllIntersections( target, tool ), target, tool );
+        IList<TopologyIntersection> intersections = /*FilterIntersections(*/ FindAllIntersections( target, tool )/*, target, tool )*/;
 
         List<bool> loop_has_intersections = new List<bool>( target.Loops.Count );
         for ( int i = 0; i < target.Loops.Count; ++i )
@@ -83,7 +101,15 @@ public class BooleanOperator
                     unprocessed_found = true;
                     var new_loop = MakeLoop( intersection, bop_map );
                     if ( new_loop != null )
-                        new_loops.Add( new_loop );
+                    {
+                        if ( new_loop.Count >= 2 )
+                        {
+                            for ( int i = 0; i < new_loop.Count; ++i )
+                                new_loop[i].Connect( new_loop[( i + new_loop.Count - 1 ) % new_loop.Count], true );
+
+                            new_loops.Add( new_loop );
+                        }
+                    }
                 }
                 if ( deadloop++ > DeadloopMaxIters )
                 {
@@ -142,7 +168,7 @@ public class BooleanOperator
         { get { return m_geom; } }
         Intersection m_geom;
 
-        public void SetCutParam ( float cut_param )
+        public void SetCutParam ( Rational cut_param )
         {
             m_geom.cut_param = cut_param;
         }
@@ -292,7 +318,7 @@ public class BooleanOperator
             if ( start != null || end != null )
                 cur_edge = CutEdgeWithIntersections( cur_edge, tool_seg, start, end );
             
-            if ( cur_edge.GetLen() > 1.0e-6 )
+            if ( cur_edge.GetLen() > 1.0e-3 )
                 seg_edges.Add( cur_edge );
 
             if ( end != null )
@@ -322,11 +348,11 @@ public class BooleanOperator
         ICuttableEdge res = edge;
 
         if ( start != null )
-            res = res.Cut( is_tool ? start.Geom.cut_param : start.Geom.face_edge_param, false );
+            res = res.Cut( (is_tool ? start.Geom.cut_param : start.Geom.face_edge_param).ToFloat, false );
 
         if ( end != null )
         {
-            float cut_param_end = is_tool ? end.Geom.cut_param : end.Geom.face_edge_param;
+            float cut_param_end = ( is_tool ? end.Geom.cut_param : end.Geom.face_edge_param ).ToFloat;
             if ( start != null )
             {
                 EvalRes end_pt = edge.Eval( cut_param_end );
@@ -431,6 +457,7 @@ public class BooleanOperator
         bool last_enters = intersections[0].ToolEdgeEnters;
         bool first_in_loop_enters = last_enters;
 
+        /*
         {
             int cur_loop_first_edge_idx = 0;
 
@@ -475,7 +502,7 @@ public class BooleanOperator
                     }
                 }
             }
-        }
+        }*/
 
         last_loop_idx = intersections[0].LoopIdx;
         last_enters = intersections[0].ToolEdgeEnters;
